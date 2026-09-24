@@ -86,6 +86,29 @@ test.describe('Game Listing and Navigation', () => {
     });
   });
 
+  test('should filter games by category and publisher together', async ({ page }) => {
+    await test.step('Open the homepage and select the filter options', async () => {
+      await page.goto('/');
+      await page.getByTestId('category-filter').selectOption({ label: 'Strategy' });
+      await page.getByTestId('publisher-filter').selectOption({ label: 'CodeForge Studios' });
+    });
+
+    await test.step('Verify only matching cards remain visible', async () => {
+      const visibleCards = page.locator('[data-testid="game-card"]:not([hidden])');
+      await expect(visibleCards).not.toHaveCount(0);
+
+      const categoryValue = await page.locator('#category-filter').evaluate((select: HTMLSelectElement) => select.value);
+      const publisherValue = await page.locator('#publisher-filter').evaluate((select: HTMLSelectElement) => select.value);
+      const count = await visibleCards.count();
+
+      for (let index = 0; index < count; index += 1) {
+        const card = visibleCards.nth(index);
+        await expect(card).toHaveAttribute('data-game-category-id', categoryValue);
+        await expect(card).toHaveAttribute('data-game-publisher-id', publisherValue);
+      }
+    });
+  });
+
   test('should display a button to back the game', async ({ page }) => {
     await test.step('Navigate to game details page', async () => {
       await page.goto('/game/1');

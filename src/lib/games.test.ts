@@ -30,6 +30,34 @@ async function seedGames(db: Database, count: number): Promise<void> {
     }
 }
 
+async function seedGamesForFiltering(db: Database) {
+    const [strategy] = await db
+        .insert(categories)
+        .values({ name: 'Strategy', description: 'cat' })
+        .returning({ id: categories.id });
+    const [puzzle] = await db
+        .insert(categories)
+        .values({ name: 'Puzzle', description: 'cat' })
+        .returning({ id: categories.id });
+    const [orbit] = await db
+        .insert(publishers)
+        .values({ name: 'Orbit Games', description: 'pub' })
+        .returning({ id: publishers.id });
+    const [pixel] = await db
+        .insert(publishers)
+        .values({ name: 'Pixel Forge', description: 'pub' })
+        .returning({ id: publishers.id });
+
+    await db.insert(games).values([
+        { title: 'Alpha', description: 'Alpha desc', starRating: 4.0, categoryId: strategy.id, publisherId: orbit.id },
+        { title: 'Beta', description: 'Beta desc', starRating: 4.5, categoryId: strategy.id, publisherId: pixel.id },
+        { title: 'Gamma', description: 'Gamma desc', starRating: 3.5, categoryId: puzzle.id, publisherId: orbit.id },
+        { title: 'Delta', description: 'Delta desc', starRating: 5.0, categoryId: puzzle.id, publisherId: pixel.id },
+    ]);
+
+    return { strategy, puzzle, orbit, pixel };
+}
+
 describe('games data-access helpers', () => {
     let db: Database;
 
@@ -50,6 +78,22 @@ describe('games data-access helpers', () => {
         const ids = await getAllGameIds(db);
         const all = await getAllGames(db);
         expect(ids).toEqual(all.map((g) => g.id));
+    });
+
+    it('filters games by category and publisher together', async () => {
+        const { strategy, orbit } = await seedGamesForFiltering(db);
+        const all = await getAllGames(db, { categoryId: strategy.id, publisherId: orbit.id });
+
+        expect(all.map((game) => game.title)).toEqual(['Alpha']);
+        expect(all.every((game) => game.category?.id === strategy.id)).toBeTruthy();
+        expect(all.every((game) => game.publisher?.id === orbit.id)).toBeTruthy();
+    });
+
+    it('filters game ids by publisher when multiple publishers are present', async () => {
+        const { orbit } = await seedGamesForFiltering(db);
+        const ids = await getAllGameIds(db, { publisherId: orbit.id });
+
+        expect(ids).toEqual([1, 3]);
     });
 
     it('fetches a single game by id', async () => {
